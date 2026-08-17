@@ -6,12 +6,23 @@ import db from './db.js';
 
 const app = express();
 const server = http.createServer(app);
+
+// Configure Socket.io with production CORS and transport fallbacks
 const io = new Server(server, {
-  cors: { origin: '*' }
+  cors: { 
+    origin: '*',
+    methods: ['GET', 'POST', 'PATCH']
+  },
+  transports: ['websocket', 'polling']
 });
 
 app.use(cors());
-app.use(express.json({ limit: '10mb' })); // Support image base64 payloads
+app.use(express.json({ limit: '10mb' })); // Support base64 image payloads
+
+// Health Check Endpoint for Railway deployment checks
+app.get('/', (req, res) => {
+  res.send('🚨 FRSC Highway Emergency API is active.');
+});
 
 // 1. Get All Incidents (For Dashboard Initial Load)
 app.get('/api/incidents', (req, res) => {
@@ -20,6 +31,7 @@ app.get('/api/incidents', (req, res) => {
     const incidents = stmt.all();
     res.json(incidents);
   } catch (error) {
+    console.error('Database fetch error:', error);
     res.status(500).json({ error: 'Failed to fetch incidents' });
   }
 });
@@ -36,13 +48,24 @@ app.post('/api/incidents', (req, res) => {
 
     stmt.run(id, highway, severity, description, latitude, longitude, image || null, timestamp);
 
-    const newIncident = { id, highway, severity, description, latitude, longitude, image, timestamp, status: 'Pending' };
+    const newIncident = { 
+      id, 
+      highway, 
+      severity, 
+      description, 
+      latitude: Number(latitude), 
+      longitude: Number(longitude), 
+      image, 
+      timestamp, 
+      status: 'Pending' 
+    };
 
-    // Emit real-time notification to web dashboard via Sockets
+    // Broadcast real-time event to Netlify Dashboard via WebSockets
     io.emit('new_incident', newIncident);
 
     res.status(201).json({ success: true, incident: newIncident });
   } catch (error) {
+    console.error('Database insert error:', error);
     res.status(500).json({ error: 'Failed to record incident' });
   }
 });
@@ -59,6 +82,7 @@ app.patch('/api/incidents/:id/status', (req, res) => {
     io.emit('status_updated', { id, status });
     res.json({ success: true, id, status });
   } catch (error) {
+    console.error('Database update error:', error);
     res.status(500).json({ error: 'Failed to update status' });
   }
 });
@@ -66,9 +90,14 @@ app.patch('/api/incidents/:id/status', (req, res) => {
 // WebSocket Connection Logging
 io.on('connection', (socket) => {
   console.log('⚡ Client connected to Control Center socket:', socket.id);
+  
+  socket.on('disconnect', () => {
+    console.log('🔌 Client disconnected:', socket.id);
+  });
 });
 
-const PORT = 5000;
+// Use Railway dynamic PORT binding (defaults to 5000 locally)
+const PORT = process.env.PORT || 5000;
 server.listen(PORT, () => {
-  console.log(`🚨 Highway Alert Server running on http://localhost:${PORT}`);
+  console.log(`🚨 Highway Alert Server running on port ${PORT}`);
 });
