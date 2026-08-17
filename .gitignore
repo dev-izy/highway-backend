@@ -1,0 +1,4 @@
+node_modules/
+highway_alerts.db
+.env
+dist/
