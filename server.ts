@@ -7,21 +7,18 @@ import db from './db.js';
 const app = express();
 const server = http.createServer(app);
 
-// Enable CORS middleware for Express with explicit options
+// 1. Enable CORS for Express (app.use(cors()) handles OPTIONS automatically)
 app.use(cors({
   origin: '*',
   methods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
-// Respond to preflight OPTIONS requests for all endpoints
-app.options('*', cors());
-
-// Expand payload limits to 50mb for base64 image strings
+// 2. Expand payload limits for base64 images
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
-// Configure Socket.io with production CORS and transport fallbacks
+// 3. Configure Socket.io with production CORS and transport fallbacks
 const io = new Server(server, {
   cors: { 
     origin: '*',
@@ -80,7 +77,7 @@ app.post('/api/incidents', (req, res) => {
       status: 'Pending' 
     };
 
-    // Broadcast real-time event to Netlify Dashboard via WebSockets
+    // Broadcast real-time event via WebSockets
     io.emit('new_incident', newIncident);
 
     res.status(201).json({ success: true, incident: newIncident });
