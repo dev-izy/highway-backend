@@ -60,6 +60,7 @@ app.post('/api/incidents', (req, res) => {
       status: 'Pending' 
     };
 
+    
     // Broadcast real-time event to Netlify Dashboard via WebSockets
     io.emit('new_incident', newIncident);
 
