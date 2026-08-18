@@ -7,6 +7,20 @@ import db from './db.js';
 const app = express();
 const server = http.createServer(app);
 
+// Enable CORS middleware for Express with explicit options
+app.use(cors({
+  origin: '*',
+  methods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+}));
+
+// Respond to preflight OPTIONS requests for all endpoints
+app.options('*', cors());
+
+// Expand payload limits to 50mb for base64 image strings
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ limit: '50mb', extended: true }));
+
 // Configure Socket.io with production CORS and transport fallbacks
 const io = new Server(server, {
   cors: { 
@@ -15,9 +29,6 @@ const io = new Server(server, {
   },
   transports: ['websocket', 'polling']
 });
-
-app.use(cors());
-app.use(express.json({ limit: '10mb' })); // Support base64 image payloads
 
 // Health Check Endpoint for Railway deployment checks
 app.get('/', (req, res) => {
@@ -46,28 +57,36 @@ app.post('/api/incidents', (req, res) => {
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'Pending')
     `);
 
-    stmt.run(id, highway, severity, description, latitude, longitude, image || null, timestamp);
+    stmt.run(
+      id || `INC-${Date.now()}`,
+      highway || 'Unknown Highway',
+      severity || 'Minor',
+      description || '',
+      latitude ? Number(latitude) : 0,
+      longitude ? Number(longitude) : 0,
+      image || null,
+      timestamp || new Date().toISOString()
+    );
 
     const newIncident = { 
-      id, 
-      highway, 
-      severity, 
-      description, 
-      latitude: Number(latitude), 
-      longitude: Number(longitude), 
-      image, 
-      timestamp, 
+      id: id || `INC-${Date.now()}`, 
+      highway: highway || 'Unknown Highway', 
+      severity: severity || 'Minor', 
+      description: description || '', 
+      latitude: latitude ? Number(latitude) : 0, 
+      longitude: longitude ? Number(longitude) : 0, 
+      image: image || null, 
+      timestamp: timestamp || new Date().toISOString(), 
       status: 'Pending' 
     };
 
-    
     // Broadcast real-time event to Netlify Dashboard via WebSockets
     io.emit('new_incident', newIncident);
 
     res.status(201).json({ success: true, incident: newIncident });
   } catch (error) {
     console.error('Database insert error:', error);
-    res.status(500).json({ error: 'Failed to record incident' });
+    res.status(500).json({ error: 'Failed to record incident', details: String(error) });
   }
 });
 
