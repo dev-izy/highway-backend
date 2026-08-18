@@ -116,7 +116,7 @@ io.on('connection', (socket) => {
   console.log('⚡ Client connected to Control Center socket:', socket.id);
 });
 
-const PORT = process.env.PORT || 5000;
-server.listen(PORT, () => {
-  console.log(`🚨 Highway Alert Server running on port ${PORT}`);
+const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 5000;
+server.listen(PORT, '0.0.0.0', () => {
+  console.log(`🚀 FRSC Highway API running on port ${PORT}`);
 });

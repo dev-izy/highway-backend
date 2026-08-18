@@ -1,17 +1,20 @@
 import Database from 'better-sqlite3';
+import path from 'path';
 
-const db: Database.Database = new Database('highway_alerts.db');
-// Create Incidents Table
+// Store SQLite DB safely in current working directory
+const dbPath = path.resolve('incidents.db');
+const db = new Database(dbPath);
+
 db.exec(`
   CREATE TABLE IF NOT EXISTS incidents (
     id TEXT PRIMARY KEY,
-    highway TEXT NOT NULL,
-    severity TEXT NOT NULL,
+    highway TEXT,
+    severity TEXT,
     description TEXT,
-    latitude REAL NOT NULL,
-    longitude REAL NOT NULL,
+    latitude REAL,
+    longitude REAL,
     image TEXT,
-    timestamp TEXT NOT NULL,
+    timestamp TEXT,
     status TEXT DEFAULT 'Pending'
   )
 `);
