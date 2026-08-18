@@ -7,18 +7,27 @@ import db from './db.js';
 const app = express();
 const server = http.createServer(app);
 
-// 1. Enable CORS for Express (app.use(cors()) handles OPTIONS automatically)
-app.use(cors({
-  origin: '*',
-  methods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
-}));
+// 1. Configure CORS Middleware
+app.use((req, res, next) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PATCH, PUT, DELETE, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+  
+  // Respond immediately to OPTIONS preflight requests
+  if (req.method === 'OPTIONS') {
+    return res.sendStatus(204);
+  }
+  next();
+});
 
-// 2. Expand payload limits for base64 images
+// 2. Fallback CORS helper
+app.use(cors());
+
+// 3. Body parsers with increased limits for Base64 image payloads
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
-// 3. Configure Socket.io with production CORS and transport fallbacks
+// 4. Configure Socket.io
 const io = new Server(server, {
   cors: { 
     origin: '*',
@@ -27,12 +36,12 @@ const io = new Server(server, {
   transports: ['websocket', 'polling']
 });
 
-// Health Check Endpoint for Railway deployment checks
+// Health Check Endpoint
 app.get('/', (req, res) => {
   res.send('🚨 FRSC Highway Emergency API is active.');
 });
 
-// 1. Get All Incidents (For Dashboard Initial Load)
+// 1. Get All Incidents
 app.get('/api/incidents', (req, res) => {
   try {
     const stmt = db.prepare('SELECT * FROM incidents ORDER BY timestamp DESC');
@@ -77,7 +86,6 @@ app.post('/api/incidents', (req, res) => {
       status: 'Pending' 
     };
 
-    // Broadcast real-time event via WebSockets
     io.emit('new_incident', newIncident);
 
     res.status(201).json({ success: true, incident: newIncident });
@@ -87,7 +95,7 @@ app.post('/api/incidents', (req, res) => {
   }
 });
 
-// 3. Update Incident Status (Dispatch / Resolve from Dashboard)
+// 3. Update Incident Status
 app.patch('/api/incidents/:id/status', (req, res) => {
   const { id } = req.params;
   const { status } = req.body;
@@ -104,16 +112,10 @@ app.patch('/api/incidents/:id/status', (req, res) => {
   }
 });
 
-// WebSocket Connection Logging
 io.on('connection', (socket) => {
   console.log('⚡ Client connected to Control Center socket:', socket.id);
-  
-  socket.on('disconnect', () => {
-    console.log('🔌 Client disconnected:', socket.id);
-  });
 });
 
-// Use Railway dynamic PORT binding (defaults to 5000 locally)
 const PORT = process.env.PORT || 5000;
 server.listen(PORT, () => {
   console.log(`🚨 Highway Alert Server running on port ${PORT}`);
